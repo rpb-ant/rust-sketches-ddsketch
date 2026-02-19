@@ -1,17 +1,15 @@
-use std::error;
-use std::fmt;
-
-use crate::config::Config;
-use crate::store::Store;
+use std::{error, fmt};
 
 #[cfg(feature = "use_serde")]
 use serde::{Deserialize, Serialize};
+
+use crate::config::Config;
+use crate::store::Store;
 
 type Result<T> = std::result::Result<T, DDSketchError>;
 
 /// General error type for DDSketch, represents either an invalid quantile or an
 /// incompatible merge operation.
-///
 #[derive(Debug, Clone)]
 pub enum DDSketchError {
     Quantile,
@@ -38,13 +36,13 @@ impl error::Error for DDSketchError {
 #[derive(Clone)]
 #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 pub struct DDSketch {
-    config: Config,
-    store: Store,
-    negative_store: Store,
-    min: f64,
-    max: f64,
-    sum: f64,
-    zero_count: u64,
+    pub(crate) config: Config,
+    pub(crate) store: Store,
+    pub(crate) negative_store: Store,
+    pub(crate) min: f64,
+    pub(crate) max: f64,
+    pub(crate) sum: f64,
+    pub(crate) zero_count: u64,
 }
 
 impl Default for DDSketch {
@@ -94,7 +92,7 @@ impl DDSketch {
     ///
     /// If the sketch is empty the result is None, else Some(v) for the quantile value.
     pub fn quantile(&self, q: f64) -> Result<Option<f64>> {
-        if q < 0.0 || q > 1.0 {
+        if !(0.0..=1.0).contains(&q) {
             return Err(DDSketchError::Quantile);
         }
 
@@ -199,14 +197,28 @@ impl DDSketch {
     fn empty(&self) -> bool {
         self.count() == 0
     }
+
+    /// Encode this sketch into the Java-compatible binary format used by
+    /// `com.datadoghq.sketch.ddsketch.DDSketchWithExactSummaryStatistics`.
+    pub fn to_java_bytes(&self) -> Vec<u8> {
+        crate::encoding::encode_to_java_bytes(self)
+    }
+
+    /// Decode a sketch from the Java-compatible binary format.
+    /// Accepts bytes produced by Java's `DDSketchWithExactSummaryStatistics.encode()`
+    /// with or without the `0x02` version prefix.
+    pub fn from_java_bytes(
+        bytes: &[u8],
+    ) -> std::result::Result<Self, crate::encoding::DecodeError> {
+        crate::encoding::decode_from_java_bytes(bytes)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use approx::assert_relative_eq;
 
-    use crate::Config;
-    use crate::DDSketch;
+    use crate::{Config, DDSketch};
 
     #[test]
     fn test_add_zero() {
