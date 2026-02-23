@@ -224,6 +224,61 @@ fn test_merge_mixed() {
 }
 
 #[test]
+fn test_merge_negative_values() {
+    let c = new_config();
+
+    // Case 1: both sketches contain only negative values.
+    // Before the fix, `was_empty` was computed as `self.store.count() == 0`,
+    // which is true when all values are negative (they live in negative_store).
+    // This caused `self.min`/`self.max` to be unconditionally overwritten with
+    // `o.min`/`o.max`, losing the receiver's correct extrema.
+    let mut sketch_a = DDSketch::new(c);
+    sketch_a.add(-5.0);
+    sketch_a.add(-1.0);
+
+    let mut sketch_b = DDSketch::new(c);
+    sketch_b.add(-10.0);
+    sketch_b.add(-2.0);
+
+    sketch_a.merge(&sketch_b).unwrap();
+    assert_eq!(sketch_a.min(), Some(-10.0), "case 1: min");
+    assert_eq!(sketch_a.max(), Some(-1.0), "case 1: max");
+    assert_eq!(sketch_a.count(), 4, "case 1: count");
+
+    // Case 2: receiver has positive values, other has only negative values.
+    // Before the fix, the `else if o.store.count() > 0` guard was false when
+    // `o` contained only negative values, so `o.min`/`o.max` were silently
+    // dropped and never merged into `self`.
+    let mut sketch_c = DDSketch::new(c);
+    sketch_c.add(1.0);
+    sketch_c.add(5.0);
+
+    let mut sketch_d = DDSketch::new(c);
+    sketch_d.add(-10.0);
+    sketch_d.add(-2.0);
+
+    sketch_c.merge(&sketch_d).unwrap();
+    assert_eq!(sketch_c.min(), Some(-10.0), "case 2: min");
+    assert_eq!(sketch_c.max(), Some(5.0), "case 2: max");
+    assert_eq!(sketch_c.count(), 4, "case 2: count");
+
+    // Case 3: receiver has only negative values, other has positive values.
+    // Same root cause as case 2, with operands swapped.
+    let mut sketch_e = DDSketch::new(c);
+    sketch_e.add(-10.0);
+    sketch_e.add(-2.0);
+
+    let mut sketch_f = DDSketch::new(c);
+    sketch_f.add(1.0);
+    sketch_f.add(5.0);
+
+    sketch_e.merge(&sketch_f).unwrap();
+    assert_eq!(sketch_e.min(), Some(-10.0), "case 3: min");
+    assert_eq!(sketch_e.max(), Some(5.0), "case 3: max");
+    assert_eq!(sketch_e.count(), 4, "case 3: count");
+}
+
+#[test]
 fn test_merge_incompatible() {
     let c1 = Config::new(TEST_ALPHA, TEST_MAX_BINS, TEST_MIN_VALUE);
     let c2 = Config::new(TEST_ALPHA * 2.0, TEST_MAX_BINS, TEST_MIN_VALUE);

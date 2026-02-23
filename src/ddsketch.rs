@@ -171,7 +171,7 @@ impl DDSketch {
             return Err(DDSketchError::Merge);
         }
 
-        let was_empty = self.store.count() == 0;
+        let was_empty = self.empty();
 
         // Merge the stores
         self.store.merge(&o.store);
@@ -183,7 +183,7 @@ impl DDSketch {
         if was_empty {
             self.min = o.min;
             self.max = o.max;
-        } else if o.store.count() > 0 {
+        } else if !o.empty() {
             if o.min < self.min {
                 self.min = o.min
             }
