@@ -35,3 +35,10 @@ would expect similar profiles to the original implementation.
 Out of the box we see can achieve over 70M sample inserts/sec and 350K sketch
 merges/sec. All tests run on a single core Intel i7 processor with 4.2Ghz max 
 clock.
+
+# Releasing
+
+- Open a PR to bump version in Cargo.toml
+- Merge version bump PR
+- Create a release using a v1.2.3 tag name
+- Github action should automatically run cargo publish
