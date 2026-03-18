@@ -14,12 +14,12 @@ fn div_ceil(dividend: i32, divisor: i32) -> i32 {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 pub struct Store {
-    bins: Vec<u64>,
-    count: u64,
-    min_key: i32,
-    max_key: i32,
-    offset: i32,
-    bin_limit: usize,
+    pub(crate) bins: Vec<u64>,
+    pub(crate) count: u64,
+    pub(crate) min_key: i32,
+    pub(crate) max_key: i32,
+    pub(crate) offset: i32,
+    pub(crate) bin_limit: usize,
     is_collapsed: bool,
 }
 
@@ -49,6 +49,13 @@ impl Store {
         let idx = self.get_index(key);
         self.bins[idx] += 1;
         self.count += 1;
+    }
+
+    /// See Java: https://github.com/DataDog/sketches-java/blob/master/src/main/java/com/datadoghq/sketch/ddsketch/store/DenseStore.java  (add(int index, double count) method)
+    pub(crate) fn add_count(&mut self, key: i32, count: u64) {
+        let idx = self.get_index(key);
+        self.bins[idx] += count;
+        self.count += count;
     }
 
     fn get_index(&mut self, key: i32) -> usize {
@@ -120,7 +127,7 @@ impl Store {
                     let zero_len = (new_min_key - self.min_key) as usize;
                     self.bins.splice(
                         collapse_start_index..collapse_end_index,
-                        std::iter::repeat(0).take(zero_len),
+                        std::iter::repeat_n(0, zero_len),
                     );
                     self.bins[collapse_end_index] += collapsed_count;
                 }
@@ -145,7 +152,7 @@ impl Store {
                 self.bins[idx] = 0;
             }
         } else {
-            let shift = shift.abs() as usize;
+            let shift = shift.unsigned_abs() as usize;
             for idx in 0..shift {
                 self.bins[idx] = 0;
             }
@@ -238,7 +245,7 @@ mod tests {
     fn test_simple_store_rev() {
         let mut s = Store::new(2048);
 
-        for i in 2048..0 {
+        for i in (0..2048).rev() {
             s.add(i);
         }
     }
